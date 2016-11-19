@@ -189,19 +189,20 @@ MetroWindow::~MetroWindow()
 	SafeRelease(&m_pFactory);
 }
 
-template <typename R, typename... Args>
-R DLLCall(const wchar_t* module, const char* procname, Args... args) throw(HRESULT)
-{
-	HMODULE hModule = LoadLibrary(module);
-	FARPROC fp = GetProcAddress(hModule, procname);
-	if (!fp)
-		throw E_POINTER;
-	typedef R(__stdcall * function_pointer)(Args...);
-	function_pointer P = (function_pointer)fp;
-	const auto return_value = (*P)(std::forward<Args>(args)...);
-	FreeLibrary(hModule);
-	return return_value;
-}
+
+//template <typename R, typename... Args>
+//R DLLCall(const wchar_t* module, const char* procname, Args... args) throw(HRESULT)
+//{
+//	HMODULE hModule = LoadLibrary(module);
+//	FARPROC fp = GetProcAddress(hModule, procname);
+//	if (!fp)
+//		throw E_POINTER;
+//	typedef R(__stdcall * function_pointer)(Args...);
+//	function_pointer P = (function_pointer)fp;
+//	const auto return_value = (*P)(std::forward<Args>(args)...);
+//	FreeLibrary(hModule);
+//	return return_value;
+//}
 
 
 LRESULT MetroWindow::InitializeWindow()
@@ -215,10 +216,10 @@ LRESULT MetroWindow::InitializeWindow()
 	pt.x = 1;
 	pt.y = 1;
 	hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-	//hr = GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
-	if (DLLCall<HRESULT>(L"Shcore.dll", "GetDpiForMonitor", hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy) == E_POINTER) {
+	hr = GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
+	//if (DLLCall<HRESULT>(L"Shcore.dll", "GetDpiForMonitor", hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy) == E_POINTER) {
 
-	}
+	//}
 
 	g_Dpi->SetScale(dpix);
 	RECT layout = { g_Dpi->Scale(100), g_Dpi->Scale(100), g_Dpi->Scale(800), g_Dpi->Scale(540) };

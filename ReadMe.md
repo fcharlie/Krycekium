@@ -34,3 +34,8 @@ Running:
 Completed:
 
 ![Completed](./doc/images/completed.png)
+
+
+## Platform
+
+master branch require Windows 8.1 or Later, win7 branch can port to Windows 7
