@@ -12,7 +12,10 @@
 #include <Mmsystem.h>
 #include <vector>
 #include <thread>
+#include <future>
+#include <Msi.h>
 #include "Resource.h"
+#include "MessageWindow.h"
 
 //#include <exception>
 #pragma comment(lib,"Comctl32.lib")
@@ -21,6 +24,7 @@
 #pragma comment(lib,"dwrite.lib")
 #pragma comment(lib,"shcore.lib")
 #pragma comment(lib,"Winmm.lib")
+#pragma comment(lib,"Msi.lib")
 
 #ifndef HINST_THISCOMPONENT
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
@@ -154,43 +158,22 @@ private:
 * Resources Initialize and Release
 */
 
-D2D1_ELLIPSE g_Ellipse0 = D2D1::Ellipse(D2D1::Point2F(300, 250), 50, 50);
-D2D1_ELLIPSE g_Ellipse1 = D2D1::Ellipse(D2D1::Point2F(300, 250), 80, 80);
-
-D2D1_ELLIPSE g_Ellipse[GEOMETRY_COUNT] =
-{
-	g_Ellipse0,
-	g_Ellipse1,
-};
-
 MetroWindow::MetroWindow()
 	:m_pFactory(nullptr),
 	m_pHwndRenderTarget(nullptr),
 	m_pSolidColorBrush(nullptr),
-	m_PushButtonNActiveBrush(nullptr),
-	m_PushButtonActiveBrush(nullptr),
-	m_PushButtonClickBrush(nullptr),
-	m_pBakcgroundEdgeBrush(nullptr),
+	m_AreaBorderBrush(nullptr),
 	m_pWriteFactory(nullptr),
 	m_pWriteTextFormat(nullptr)
 {
 	g_Dpi = new CDPI();
 	g_Dpi->SetAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
-	MetroLabel ml = { { 20, 50, 120, 75 }, L"Package:" };
-	MetroButton find({ 540, 50, 640, 75 }, L"View...",
-					 std::bind(&MetroWindow::KrycekiumDiscoverPackageButtonActive, this, std::placeholders::_1));
-	MetroLabel ml2 = { { 20, 100, 120, 125 }, L"Folder:" };
-	MetroButton folderfind({ 540, 100, 640, 125 }, L"Select",
-						   std::bind(&MetroWindow::KrycekiumDiscoverFolderButtonActive, this, std::placeholders::_1));
-	MetroButton taskbutton({ 540, 300, 640, 325 }, L"Run",
-						   std::bind(&MetroWindow::KrycekiumTaskRun, this, std::placeholders::_1));
-	MetroLabel info = { { 80, 345, 480, 370 }, L"\x263B \x2665 Copyright \x0A9 2016.Force Charlie.All Rights Reserved." };
+	KryceLabel ml = { { 30, 50, 120, 75 }, L"Package\t\xD83D\xDCE6:" };
+	KryceLabel ml2 = { { 30, 100, 120, 125 }, L"Folder\t\xD83D\xDCC1:" };
+	KryceLabel info = { { 120, 345, 540, 370 }, L"\x263B \x2665 Copyright \x0A9 2016.Force Charlie.All Rights Reserved." };
 	label_.push_back(std::move(ml));
 	label_.push_back(std::move(info));
 	label_.push_back(std::move(ml2));
-	button_.push_back(std::move(find));
-	button_.push_back(std::move(folderfind));
-	button_.push_back(std::move(taskbutton));
 }
 MetroWindow::~MetroWindow()
 {
@@ -201,20 +184,7 @@ MetroWindow::~MetroWindow()
 	SafeRelease(&m_pWriteFactory);
 	SafeRelease(&m_pSolidColorBrush);
 
-	SafeRelease(&m_PushButtonNActiveBrush);
-	SafeRelease(&m_PushButtonActiveBrush);
-	SafeRelease(&m_PushButtonClickBrush);
-
-	SafeRelease(&m_pBakcgroundEdgeBrush);
-
-	SafeRelease(&m_pGeometryGroup);
-	SafeRelease(&m_pRadialGradientBrush);
-
-	for (int i = 0; i < GEOMETRY_COUNT; ++i) {
-		SafeRelease(&m_pEllipseArray[i]);
-		m_pEllipseArray[i] = NULL;
-	}
-
+	SafeRelease(&m_AreaBorderBrush);
 	SafeRelease(&m_pHwndRenderTarget);
 	SafeRelease(&m_pFactory);
 }
@@ -238,7 +208,8 @@ LRESULT MetroWindow::InitializeWindow()
 	}
 	g_Dpi->SetScale(dpix);
 	RECT layout = { g_Dpi->Scale(100), g_Dpi->Scale(100), g_Dpi->Scale(800), g_Dpi->Scale(540) };
-	Create(nullptr, layout, L"Krycekium Msi Unpacker",
+	windowTitle.assign(L"Krycekium Installer");
+	Create(nullptr, layout, windowTitle.c_str(),
 		   WS_NORESIZEWINDOW,
 		   WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
 	return S_OK;
@@ -277,36 +248,6 @@ HRESULT MetroWindow::CreateDeviceResources()
 			);
 		if (SUCCEEDED(hr)) {
 			hr = m_pHwndRenderTarget->CreateSolidColorBrush(
-				D2D1::ColorF(D2D1::ColorF::Blue),
-				&m_pBakcgroundEdgeBrush
-				);
-		}
-		D2D1_GRADIENT_STOP gradientStops[2];
-		gradientStops[0].color = D2D1::ColorF(D2D1::ColorF::Cyan);
-		gradientStops[0].position = 0.5f;
-		gradientStops[1].color = D2D1::ColorF(D2D1::ColorF::RoyalBlue);
-		gradientStops[1].position = 1.f;
-
-		// Create gradient stops collection
-		ID2D1GradientStopCollection* pGradientStops = NULL;
-		hr = m_pHwndRenderTarget->CreateGradientStopCollection(
-			gradientStops,
-			2,
-			D2D1_GAMMA_2_2,
-			D2D1_EXTEND_MODE_CLAMP,
-			&pGradientStops
-			);
-		hr = m_pHwndRenderTarget->CreateRadialGradientBrush(
-			D2D1::RadialGradientBrushProperties(
-			D2D1::Point2F(170, 170),
-			D2D1::Point2F(0, 0),
-			150,
-			150),
-			pGradientStops,
-			&m_pRadialGradientBrush
-			);
-		if (SUCCEEDED(hr)) {
-			hr = m_pHwndRenderTarget->CreateSolidColorBrush(
 				D2D1::ColorF(D2D1::ColorF::Black),
 				&m_pSolidColorBrush
 				);
@@ -314,34 +255,9 @@ HRESULT MetroWindow::CreateDeviceResources()
 		if (SUCCEEDED(hr)) {
 			hr = m_pHwndRenderTarget->CreateSolidColorBrush(
 				D2D1::ColorF(D2D1::ColorF::Orange),
-				&m_PushButtonNActiveBrush
+				&m_AreaBorderBrush
 				);
 		}
-		if (SUCCEEDED(hr)) {
-			hr = m_pHwndRenderTarget->CreateSolidColorBrush(
-				D2D1::ColorF(0xFFC300),
-				&m_PushButtonActiveBrush
-				);
-		}
-		if (SUCCEEDED(hr)) {
-			hr = m_pHwndRenderTarget->CreateSolidColorBrush(
-				D2D1::ColorF(D2D1::ColorF::DarkOrange, 2.0f),
-				&m_PushButtonClickBrush
-				);
-		}
-		for (int i = 0; i < GEOMETRY_COUNT; ++i) {
-			hr = m_pFactory->CreateEllipseGeometry(g_Ellipse[i], &m_pEllipseArray[i]);
-			if (FAILED(hr)) {
-				::MessageBoxW(m_hWnd, L"Create Ellipse Geometry failed!", L"Error", MB_OK|MB_ICONERROR);
-				return S_FALSE;
-			}
-		}
-		hr = m_pFactory->CreateGeometryGroup(
-			D2D1_FILL_MODE_ALTERNATE,
-			(ID2D1Geometry**)&m_pEllipseArray,
-			ARRAYSIZE(m_pEllipseArray),
-			&m_pGeometryGroup
-			);
 	}
 	return hr;
 
@@ -369,10 +285,13 @@ HRESULT MetroWindow::OnRender()
 #pragma warning(disable:4244)
 #pragma warning(disable:4267)
 	if (SUCCEEDED(hr)) {
+		RECT rect;
+		GetWindowRect(&rect);
 		m_pHwndRenderTarget->BeginDraw();
 		m_pHwndRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
 		m_pHwndRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White, 1.0f));
-		//m_pWriteTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+		m_pHwndRenderTarget->DrawRectangle(D2D1::RectF(20, 10, rect.right - rect.left - 40, 155), m_AreaBorderBrush, 1.0);
+		m_pHwndRenderTarget->DrawRectangle(D2D1::RectF(20, 155, rect.right - rect.left - 40, 385), m_AreaBorderBrush, 1.0);
 		for (auto &label : label_) {
 			if (label.text.empty())
 				continue;
@@ -382,77 +301,6 @@ HRESULT MetroWindow::OnRender()
 										   D2D1::RectF(label.layout.left, label.layout.top, label.layout.right, label.layout.bottom),
 										   m_pSolidColorBrush,
 										   D2D1_DRAW_TEXT_OPTIONS_NONE, DWRITE_MEASURING_MODE_NATURAL);
-		}
-		for (auto &it : item_) {
-			if (it.name.empty() || it.value.empty())
-				continue;
-			m_pHwndRenderTarget->DrawTextW(it.name.c_str(),
-										   it.name.size(),
-										   m_pWriteTextFormat,
-										   D2D1::RectF(it.layout.left, it.layout.top, it.layout.left + 135.0f, it.layout.bottom),
-										   m_pSolidColorBrush,
-										   D2D1_DRAW_TEXT_OPTIONS_NONE, DWRITE_MEASURING_MODE_NATURAL);
-			m_pHwndRenderTarget->DrawTextW(it.value.c_str(),
-										   it.value.size(),
-										   m_pWriteTextFormat,
-										   D2D1::RectF(it.layout.left + 140.0f, it.layout.top, it.layout.right, it.layout.bottom),
-										   m_pSolidColorBrush,
-										   D2D1_DRAW_TEXT_OPTIONS_NONE, DWRITE_MEASURING_MODE_NATURAL);
-		}
-		m_pWriteTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-		for (auto &b : button_) {
-			m_pHwndRenderTarget->DrawRectangle(
-				D2D1::RectF(b.layout.left, b.layout.top, b.layout.right, b.layout.bottom),
-				m_pBakcgroundEdgeBrush,
-				0.3f, 0);
-			switch (b.status) {
-				case MetroButton::kKeyDown:
-				m_pHwndRenderTarget->FillRectangle(
-					D2D1::RectF(b.layout.left, b.layout.top, b.layout.right, b.layout.bottom),
-					m_PushButtonClickBrush);
-				break;
-				case MetroButton::kKeyActive:
-				m_pHwndRenderTarget->FillRectangle(
-					D2D1::RectF(b.layout.left, b.layout.top, b.layout.right, b.layout.bottom),
-					m_PushButtonActiveBrush);
-				break;
-				case MetroButton::kKeyLeave:
-				default:
-				m_pHwndRenderTarget->FillRectangle(
-					D2D1::RectF(b.layout.left, b.layout.top, b.layout.right, b.layout.bottom),
-					m_PushButtonNActiveBrush);
-				break;
-			}
-			if (!b.caption.empty()) {
-				m_pHwndRenderTarget->DrawTextW(b.caption.c_str(),
-											   b.caption.size(),
-											   m_pWriteTextFormat,
-											   D2D1::RectF(b.layout.left, b.layout.top, b.layout.right, b.layout.bottom),
-											   m_pSolidColorBrush,
-											   D2D1_DRAW_TEXT_OPTIONS_NONE, DWRITE_MEASURING_MODE_NATURAL);
-			}
-		}
-		if (taskrunning_) {
-			static float totalAngle = 0.0f;
-			static DWORD lastTime = timeGetTime();
-
-			// Get current time
-			DWORD currentTime = timeGetTime();
-
-			// Calculate time elapsed in current frame.
-			float timeDelta = (float)(currentTime - lastTime) * 0.1;
-
-			// Increase the totalAngle by the time elapsed in current frame.
-			totalAngle += timeDelta;
-			m_pHwndRenderTarget->DrawGeometry(m_pGeometryGroup, m_PushButtonClickBrush);
-
-			// Roatate the gradient brush based on the total elapsed time
-			D2D1_MATRIX_3X2_F rotMatrix = D2D1::Matrix3x2F::Rotation(totalAngle, D2D1::Point2F(300, 300));
-			m_pRadialGradientBrush->SetTransform(rotMatrix);
-
-			// Fill geometry group with the transformed brush
-			m_pHwndRenderTarget->FillGeometry(m_pGeometryGroup, m_pRadialGradientBrush);
-
 		}
 		hr = m_pHwndRenderTarget->EndDraw();
 	}
@@ -490,6 +338,10 @@ void MetroWindow::OnResize(
 /*
 *  Message Action Function
 */
+#define WINDOWEXSTYLE WS_EX_LEFT | WS_EX_LTRREADING | WS_EX_RIGHTSCROLLBAR | WS_EX_NOPARENTNOTIFY
+#define EDITBOXSTYLE  WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_VISIBLE |WS_TABSTOP | ES_LEFT | ES_AUTOHSCROLL
+#define PUSHBUTTONSTYLE BS_PUSHBUTTON | BS_TEXT | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE
+#define PROGRESSRATESTYLE WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_VISIBLE
 LRESULT MetroWindow::OnCreate(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle)
 {
 	auto hr = Initialize();
@@ -504,37 +356,51 @@ LRESULT MetroWindow::OnCreate(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHa
 	ChangeWindowMessageFilter(WM_COPYDATA, MSGFLT_ADD);
 	ChangeWindowMessageFilter(0x0049, MSGFLT_ADD);
 	::DragAcceptFiles(m_hWnd, TRUE);
-	DWORD dwEditEx = WS_EX_LEFT | WS_EX_LTRREADING | WS_EX_RIGHTSCROLLBAR | \
-		WS_EX_NOPARENTNOTIFY | WS_EX_CLIENTEDGE;
-	DWORD dwEdit = WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_VISIBLE | \
-		WS_TABSTOP | ES_LEFT | ES_AUTOHSCROLL;
+
 	HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 	LOGFONT logFont = { 0 };
-	GetObject(hFont, sizeof(logFont), &logFont);
+	GetObjectW(hFont, sizeof(logFont), &logFont);
 	DeleteObject(hFont);
 	hFont = NULL;
-	logFont.lfHeight = 19;
+	logFont.lfHeight = 20;
 	logFont.lfWeight = FW_NORMAL;
 	wcscpy_s(logFont.lfFaceName, L"Segoe UI");
-	hFont = CreateFontIndirect(&logFont);
-
-	HWND hEdit = CreateWindowExW(dwEditEx, WC_EDITW,
-								 L"",
-								 dwEdit, 90, 50, 435, 27,
-								 m_hWnd,
-								 HMENU(IDC_PACKAGE_URI_EDIT),
-								 HINST_THISCOMPONENT,
-								 NULL);
-	HWND hEdit2 = CreateWindowExW(dwEditEx, WC_EDITW,
-								 L"",
-								 dwEdit, 90, 100, 435, 27,
-								 m_hWnd,
-								 HMENU(IDC_FOLDER_URI_EDIT),
-								 HINST_THISCOMPONENT,
-								 NULL);
-	//::SetWindowFont(hEdit, hFont, TRUE);
-	::SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
-	::SendMessage(hEdit2, WM_SETFONT, (WPARAM)hFont, TRUE);
+	hFont = CreateFontIndirectW(&logFont);
+	auto LambdaCreateWindow = [&](LPCWSTR lpClassName, LPCWSTR lpWindowName, DWORD dwStyle,
+								  int X, int Y, int nWidth, int nHeight, HMENU hMenu)->HWND{
+		auto hw = CreateWindowExW(WINDOWEXSTYLE, lpClassName, lpWindowName,
+								  dwStyle, X, Y, nWidth, nHeight, m_hWnd, hMenu, HINST_THISCOMPONENT, nullptr);
+		if (hw) {
+			::SendMessageW(hw, WM_SETFONT, (WPARAM)hFont, lParam);
+		}
+		return hw;
+	};
+	auto LambdaCreateWindowEdge = [&](LPCWSTR lpClassName, LPCWSTR lpWindowName, DWORD dwStyle,
+								  int X, int Y, int nWidth, int nHeight, HMENU hMenu)->HWND{
+		auto hw = CreateWindowExW(WINDOWEXSTYLE | WS_EX_CLIENTEDGE, lpClassName, lpWindowName,
+								  dwStyle, X, Y, nWidth, nHeight, m_hWnd, hMenu, HINST_THISCOMPONENT, nullptr);
+		if (hw) {
+			::SendMessageW(hw, WM_SETFONT, (WPARAM)hFont, lParam);
+		}
+		return hw;
+	};
+	hUriEdit = LambdaCreateWindowEdge(WC_EDITW, L"", EDITBOXSTYLE, 125, 50, 420, 27, HMENU(IDC_PACKAGE_URI_EDIT));
+	hDirEdit = LambdaCreateWindowEdge(WC_EDITW, L"", EDITBOXSTYLE, 125, 100, 420, 27, HMENU(IDC_FOLDER_URI_EDIT));
+	hUriButton = LambdaCreateWindow(WC_BUTTONW, L"View...", PUSHBUTTONSTYLE, 560, 50, 90, 27,HMENU(IDC_PACKAGE_VIEW_BUTTON));
+	hDirButton = LambdaCreateWindow(WC_BUTTONW, L"Folder...", PUSHBUTTONSTYLE, 560, 100, 90, 27, HMENU(IDC_FOLDER_URI_BUTTON));
+	hProgress = LambdaCreateWindow(PROGRESS_CLASSW, L"", PROGRESSRATESTYLE, 125, 180, 420, 27, HMENU(IDC_PROCESS_RATE));
+	hOK = LambdaCreateWindow(WC_BUTTONW, L"Start", PUSHBUTTONSTYLE, 125, 270, 205, 30, HMENU(IDC_OPTION_BUTTON_OK));
+	hCancel = LambdaCreateWindow(WC_BUTTONW, L"Cancel", PUSHBUTTONSTYLE, 340, 270, 205, 30, HMENU(IDC_OPTION_BUTTON_CANCEL));
+	{
+		int numArgc=0;
+		auto Argv=CommandLineToArgvW(GetCommandLineW(), &numArgc);
+		if (Argv ){
+			if (numArgc >= 2 && PathFileExistsW(Argv[1])) {
+				::SetWindowTextW(hUriEdit, Argv[1]);
+			}
+			LocalFree(Argv);
+		}
+	}
 	return S_OK;
 }
 LRESULT MetroWindow::OnDestroy(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle)
@@ -579,7 +445,6 @@ LRESULT MetroWindow::OnDropfiles(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &
 		}
 		if (!filelist.empty()) {
 			::SetWindowTextW(::GetDlgItem(m_hWnd, IDC_PACKAGE_URI_EDIT), filelist[0].c_str());
-			//KcycekiumFolderSet(filelist[0]);
 		}
 	}
 	DragFinish(hDrop);
@@ -587,57 +452,17 @@ LRESULT MetroWindow::OnDropfiles(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &
 	return S_OK;
 }
 
-LRESULT MetroWindow::OnLButtonUP(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle)
-{
-	POINT pt;
-	GetCursorPos(&pt);
-	ScreenToClient(&pt);
-	for (auto &b : button_) {
-		if (pt.x >= b.layout.left
-			&& pt.x <= b.layout.right
-			&&pt.y >= b.layout.top
-			&&pt.y <= b.layout.bottom
-			) {
-			b.callback(L"this is debug message");
-			b.status = MetroButton::kKeyActive;
-			break;
-		}
-		b.status = MetroButton::kKeyLeave;
-	}
-	::InvalidateRect(m_hWnd, nullptr, TRUE);
-	return 0;
-}
-LRESULT MetroWindow::OnLButtonDown(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle)
-{
-	POINT pt;
-	GetCursorPos(&pt);
-	ScreenToClient(&pt);
-	for (auto &b : button_) {
-		if (pt.x >= b.layout.left
-			&& pt.x <= b.layout.right
-			&&pt.y >= b.layout.top
-			&&pt.y <= b.layout.bottom
-			) {
-			b.status = MetroButton::kKeyDown;
-			break;
-		}
-		b.status = MetroButton::kKeyLeave;
-	}
-	::InvalidateRect(m_hWnd, nullptr, FALSE);
-	return 0;
-}
-
-LRESULT MetroWindow::KrycekiumDiscoverPackageButtonActive(const wchar_t *debugMessage)
+LRESULT MetroWindow::OnDiscoverPackage(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
 {
 	std::wstring packagefile;
 	if (KrycekiumDiscoverWindow(m_hWnd, packagefile, L"Get Microsoft Installer Package")) {
 		::SetWindowTextW(GetDlgItem(IDC_PACKAGE_URI_EDIT), packagefile.c_str());
-		//KcycekiumFolderSet(packagefile);
 	}
 	return S_OK;
 }
 
-LRESULT MetroWindow::KrycekiumDiscoverFolderButtonActive(const wchar_t *debugMessage)
+
+LRESULT MetroWindow::OnDiscoverFolder(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
 {
 	std::wstring folder;
 	if (KrycekiumFolderOpenWindow(m_hWnd, folder, L"")) {
@@ -646,71 +471,288 @@ LRESULT MetroWindow::KrycekiumDiscoverFolderButtonActive(const wchar_t *debugMes
 	return S_OK;
 }
 
-LRESULT MetroWindow::KrycekiumTaskRun(const wchar_t *debugMessage)
+INT CALLBACK InstallUICallback(
+	LPVOID  pvContext,
+	UINT    iMessageType,
+	LPCWSTR szMessage
+	)
 {
-	if (taskrunning_)
+	return reinterpret_cast<MetroWindow *>(pvContext)->InstanllUIHandler(iMessageType, szMessage);
+}
+
+inline bool FolderIsEmpty(const std::wstring &dir)
+{
+	std::wstring dir_(dir);
+	dir_.append(L"\\*.*");
+	WIN32_FIND_DATAW fdata;
+	auto hFind = FindFirstFileW(dir_.c_str(), &fdata);
+	if (hFind == INVALID_HANDLE_VALUE)
+		return true;
+	BOOL ret=true;
+	while (ret) {
+		if (wcscmp(fdata.cFileName, L".") != 0 
+			&& wcscmp(fdata.cFileName, L"..")!=0)
+		{
+			FindClose(hFind);
+			return false;
+		}
+		ret = FindNextFileW(hFind, &fdata);
+	}
+	FindClose(hFind);
+	return true;
+}
+
+LRESULT MetroWindow::OnStartTask(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
+{
+	if (!mtx.try_lock()) {
+		/// Task is running
+		//MessageWindowEx(m_hWnd, L"Task Running",L:)
 		return S_FALSE;
-	//MsgWaitForMultipleObjects
+	} else {
+		mtx.unlock();
+	}
 	WCHAR packfile[4096];
 	WCHAR folder[4096];
-	auto len=::GetWindowTextW(::GetDlgItem(m_hWnd, IDC_PACKAGE_URI_EDIT), packfile, 4096);
-	if (len == 0)
+	auto len = ::GetWindowTextW(::GetDlgItem(m_hWnd, IDC_PACKAGE_URI_EDIT), packfile, 4096);
+	if (len == 0) {
+		MessageWindowEx(m_hWnd, L"Package Path Empty",L"Please Input Package Path" , nullptr, kFatalWindow);
 		return S_FALSE;
-	auto len2=::GetWindowTextW(::GetDlgItem(m_hWnd, IDC_FOLDER_URI_EDIT), folder, 4096);
-	if (len2 == 0)
+	}
+	auto len2 = ::GetWindowTextW(::GetDlgItem(m_hWnd, IDC_FOLDER_URI_EDIT), folder, 4096);
+	if (len2 == 0) {
+		MessageWindowEx(m_hWnd, L"Folder Path Empty", L"Please Input Folder Path", nullptr, kFatalWindow);
 		return S_FALSE;
+	}
+
 	argument_.packfile.assign(packfile, len);
 	argument_.folder.assign(folder, len);
-	std::thread([&]{
-		std::vector<wchar_t> Array(PATHCCH_MAX_CCH);
-		auto cmdline = Array.data();
-		const wchar_t *format = LR"(msiexec /a "%s" /qn TARGETDIR="%s")";
-		swprintf_s(cmdline, Array.capacity(), format, packfile, folder);
-		STARTUPINFOW si;
-		PROCESS_INFORMATION pi;
-		SecureZeroMemory(&si, sizeof(si));
-		SecureZeroMemory(&pi, sizeof(pi));
-		si.cb = sizeof(si);
-		taskrunning_ = true;
-		PostMessageW(WM_PAINT, 0, 0);
-		auto result = CreateProcessW(nullptr, cmdline, nullptr, nullptr, FALSE,
-									 CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,
-									 nullptr, nullptr, &si, &pi);
-		WCHAR error[4096];
-		if (!result) {
-			taskrunning_ = false;
-			LPVOID lpMessageBuf;
-			FormatMessageW(
-				FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-				nullptr,
-				GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-				(LPWSTR)&lpMessageBuf, 0, nullptr);
-			//FormatMessageW()
-			swprintf_s(error, L"ERROR: %s", lpMessageBuf);
-			LocalFree(lpMessageBuf);
-			MessageBoxW(error, L"Invoke msiexec broken", MB_OK | MB_ICONERROR);
-		} else {
-			WaitForSingleObject(pi.hProcess, INFINITE);
-			DWORD dwExit;
-			GetExitCodeProcess(pi.hProcess, &dwExit);
-			if (dwExit != 0) {
-				swprintf_s(error, L"msiexec exit with %d", dwExit);
-				MessageBoxW(error, L"Execute msiexec broken", MB_OK | MB_ICONERROR);
-			} else {
-				MessageBoxW(L"Unpack file success !", L"Unpack success", MB_OK|MB_ICONINFORMATION);
+	InstallValueReset();
+	std::wstring title(windowTitle);
+	title.append(L" (Running...)");
+	SetWindowTextW(title.c_str());
+	std::thread([&,this]{
+		std::lock_guard<std::mutex> lock(this->mtx);
+		auto fileName = PathFindFileNameW(argument_.packfile.c_str());
+		WCHAR FileName[256];
+		wcscpy_s(FileName, fileName);
+		std::wstring dupfolder(folder);
+		PathRemoveExtensionW(FileName);
+		if (!FolderIsEmpty(dupfolder)) {
+			dupfolder.append(L"\\").append(FileName);
+		}
+		if (!PathFileExistsW(dupfolder.c_str())) {
+			if (!CreateDirectoryW(dupfolder.c_str(), nullptr)) {
+				ErrorMessage error(GetLastError());
+				///Error
+				MessageWindowEx(m_hWnd, L"Error", error.message(), nullptr, kFatalWindow);
+				return ;
 			}
-			this->UnsetTaskIsRunning();
-			::InvalidateRect(this->m_hWnd, nullptr, FALSE);
+		}
+		std::vector<wchar_t> Command(PATHCCH_MAX_CCH);
+		swprintf_s(Command.data(), Command.capacity(), L"ACTION=ADMIN TARGETDIR=\"%s\"", dupfolder.c_str());
+		MsiSetInternalUI(INSTALLUILEVEL(INSTALLUILEVEL_NONE | INSTALLUILEVEL_SOURCERESONLY), NULL);
+
+		MsiSetExternalUIW(InstallUICallback,
+						 INSTALLLOGMODE_PROGRESS | INSTALLLOGMODE_FATALEXIT | INSTALLLOGMODE_ERROR
+						 | INSTALLLOGMODE_WARNING | INSTALLLOGMODE_USER | INSTALLLOGMODE_INFO
+						 | INSTALLLOGMODE_RESOLVESOURCE | INSTALLLOGMODE_OUTOFDISKSPACE
+						 | INSTALLLOGMODE_ACTIONSTART | INSTALLLOGMODE_ACTIONDATA
+						 | INSTALLLOGMODE_COMMONDATA | INSTALLLOGMODE_PROGRESS | INSTALLLOGMODE_INITIALIZE
+						 | INSTALLLOGMODE_TERMINATE | INSTALLLOGMODE_SHOWDIALOG,
+						 this);
+		auto err=MsiInstallProductW(argument_.packfile.c_str(), Command.data());
+		std::wstring title2(windowTitle);
+		if (err == ERROR_SUCCESS) {
+			title2.append(L" (Completed)");
+			this->SetWindowTextW(title2.c_str());
+		} else {
+			title2.append(L" (Failure)");
+			this->SetWindowTextW(title2.c_str());
+			ErrorMessage err(GetLastError());
+			MessageWindowEx(m_hWnd, L"Failure", err.message(), nullptr, kFatalWindow);
 		}
 	}).detach();
 	return S_OK;
 }
 
-
-void MetroWindow::KcycekiumFolderSet(const std::wstring &package)
+LRESULT MetroWindow::OnCancelTask(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
 {
-	std::wstring folder = package;
-	PathRemoveFileSpecW(&folder[0]);
-	::SetWindowTextW(GetDlgItem(IDC_FOLDER_URI_EDIT), &folder[0]);
-	//PathRemoveFileSpecW()
+	requireCancel = true;
+	return S_OK;
+}
+
+int FGetInteger(WCHAR*& rpch)
+{
+	WCHAR* pchPrev = rpch;
+	while (*rpch && *rpch != L' ')
+		rpch++;
+	*rpch = L'\0';
+	int i = _wtoi(pchPrev);
+	return i;
+}
+
+BOOL ParseProgressString(LPWSTR sz, int* pnFields)
+{
+	WCHAR* pch = sz;
+	if (0 == *pch)
+		return FALSE; // no msg
+
+	while (*pch != 0) {
+		WCHAR chField = *pch++;
+		pch++; // for ':'
+		pch++; // for sp
+		switch (chField) {
+			case L'1': // field 1
+			{
+				// progress message type
+				if (0 == isdigit(*pch))
+					return FALSE; // blank record
+				pnFields[0] = *pch++ - L'0';
+				break;
+			}
+			case L'2': // field 2
+			{
+				pnFields[1] = FGetInteger(pch);
+				if (pnFields[0] == 2 || pnFields[0] == 3)
+					return TRUE; // done processing
+				break;
+			}
+			case '3': // field 3
+			{
+				pnFields[2] = FGetInteger(pch);
+				if (pnFields[0] == 1)
+					return TRUE; // done processing
+				break;
+			}
+			case '4': // field 4
+			{
+				pnFields[3] = FGetInteger(pch);
+				return TRUE; // done processing
+			}
+			default: // unknown field
+			{
+				return FALSE;
+			}
+		}
+		pch++; // for space (' ') between fields
+	}
+
+	return TRUE;
+}
+
+int MetroWindow::InstanllUIHandler(UINT iMessageType, LPCWSTR szMessage)
+{
+	if (requireCancel)
+		return IDCANCEL;
+	if (!szMessage)
+		return 0;
+	INSTALLMESSAGE mt;
+	UINT uiFlags;
+
+	mt = (INSTALLMESSAGE)(0xFF000000 & (UINT)iMessageType);
+	uiFlags = 0x00FFFFFF & iMessageType;
+	switch (mt) {
+		case INSTALLMESSAGE_FATALEXIT:
+		MessageWindowEx(m_hWnd, L"Install Failed !", szMessage, nullptr, kFatalWindow);
+		return 1;
+		case INSTALLMESSAGE_ERROR:
+		{
+			/* Get error message here and display it*/
+			// language and caption can be obtained from common data msg
+			MessageBeep(uiFlags & MB_ICONMASK);
+			return ::MessageBoxEx(m_hWnd, szMessage, TEXT("Error"), uiFlags, LANG_NEUTRAL);
+		}
+		case INSTALLMESSAGE_WARNING:
+		MessageWindowEx(m_hWnd, L"Warning", szMessage, nullptr, kWarnWindow);
+		return 0;
+		case INSTALLMESSAGE_USER:
+		/* Get user message here */
+		// parse uiFlags to get Message Box Styles Flag and return appopriate value, IDOK, IDYES, etc.
+		return IDOK;
+
+		case INSTALLMESSAGE_INFO:
+		return IDOK;
+
+		case INSTALLMESSAGE_FILESINUSE:
+		/* Display FilesInUse dialog */
+		// parse the message text to provide the names of the 
+		// applications that the user can close so that the 
+		// files are no longer in use.
+		return 0;
+
+		case INSTALLMESSAGE_RESOLVESOURCE:
+		/* ALWAYS return 0 for ResolveSource */
+		return 0;
+
+		case INSTALLMESSAGE_OUTOFDISKSPACE:
+		/* Get user message here */
+		return IDOK;
+
+		case INSTALLMESSAGE_ACTIONSTART:
+		/* New action started, any action data is sent by this new action */
+		mEnableActionData = FALSE;
+		return IDOK;
+		break;
+		case INSTALLMESSAGE_ACTIONDATA:
+		if (0 == mProgressTotal)
+			return IDOK;
+		if (mEnableActionData) {
+			::SendMessageW(hProgress, PBM_STEPIT, 0, 0);
+		}
+		return IDOK;
+		break;
+		case INSTALLMESSAGE_PROGRESS:{
+			if (ParseProgressString(const_cast<LPWSTR>(szMessage),iField)) {
+				switch (iField[0]) {
+					case 0:
+					{
+						mProgressTotal = iField[1];
+						if (iField[2] == 0)
+							mForwardProgress = true;
+						else
+							mForwardProgress = false;
+						mProgress = mForwardProgress ? 0 : mProgressTotal;
+						::SendMessageW(hProgress, PBM_SETRANGE32, 0, mProgressTotal);
+						::SendMessageW(hProgress, PBM_SETPOS, mScriptInProgress ? mProgressTotal : mProgress, 0);
+						iCurPos = 0;
+						mScriptInProgress = (iField[3] == 1) ? TRUE : FALSE;
+					}break;
+					case 1:{
+						if (iField[2]) {
+							::SendMessageW(hProgress, PBM_SETSTEP, mForwardProgress ? iField[1] : -1 * iField[1], 0);
+							mEnableActionData = TRUE;
+						} else {
+							mEnableActionData = FALSE;
+						}
+					}break;
+					case 2:
+					{
+						if (0 == mProgressTotal)
+							break;
+
+						iCurPos += iField[1];
+						::SendMessageW(hProgress, PBM_SETPOS, mForwardProgress ? iCurPos : -1 * iCurPos, 0);
+
+					}
+					break;
+					default:
+					break;
+				}
+			}
+		}
+		return IDOK;
+		case INSTALLMESSAGE_INITIALIZE:
+		return IDOK;
+
+		// Sent after UI termination, no string data
+		case INSTALLMESSAGE_TERMINATE:
+		return IDOK;
+
+		//Sent prior to display of authored dialog or wizard
+		case INSTALLMESSAGE_SHOWDIALOG:
+		return IDOK;
+		default:
+		break;
+	}
+	return 0;
 }

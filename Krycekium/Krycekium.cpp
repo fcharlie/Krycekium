@@ -45,7 +45,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance,
 					_In_ int       nCmdShow)
 {
 	if (!IsWindows7SP1OrGreater()) {
-		MessageBoxW(nullptr, L"You need at least Windows 10.", L"Version Not Supported", MB_OK | MB_ICONERROR);
+		MessageBoxW(nullptr, L"You need at least Windows 7 SP1.", L"Not Supported", MB_OK | MB_ICONERROR);
 		return -1;
 	}
 	DotComInitialize dot;

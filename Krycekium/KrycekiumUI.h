@@ -16,10 +16,15 @@
 #include <wincodec.h>
 #include <vector>
 #include <functional>
+#include <mutex>
 
 #define IDC_PACKAGE_URI_EDIT 1010
 #define IDC_PACKAGE_VIEW_BUTTON 1011
 #define IDC_FOLDER_URI_EDIT 1012
+#define IDC_FOLDER_URI_BUTTON 1013
+#define IDC_PROCESS_RATE 1014
+#define IDC_OPTION_BUTTON_OK 1015
+#define IDC_OPTION_BUTTON_CANCEL 1016
 
 bool KrycekiumDiscoverWindow(
 	HWND hParent,
@@ -34,47 +39,17 @@ bool KrycekiumFolderOpenWindow(
 #define KRYCEKIUM_UI_MAINWINDOW _T("Krycekium.Render.UI.Window")
 typedef CWinTraits<WS_OVERLAPPEDWINDOW, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE> CMetroWindowTraits;
 
-struct MetroTitle {
-	RECT layout;
-	std::wstring title;
-};
-
-struct MetroLabel {
+struct KryceLabel {
 	RECT layout;
 	std::wstring text;
 };
 
-struct MetroTextItem {
+struct KryceText {
 	RECT layout;
 	std::wstring name;
 	std::wstring value;
 };
 
-struct MetroTextArea {
-	RECT layout;
-	D2D1::ColorF backend;
-	std::wstring text;
-};
-
-struct MetroButton {
-	enum {
-		kKeyLeave = 0,
-		kKeyActive=1,
-		kKeyDown,
-		kButtonDisable
-	};
-	MetroButton(RECT layout_, const wchar_t *caption, std::function<LRESULT(const wchar_t *)> c)
-		:layout(layout_), 
-		caption(caption),
-		callback(c)
-	{
-		status = kKeyLeave;
-	}
-	std::function<LRESULT(const wchar_t *)> callback;
-	int status;
-	RECT layout;
-	std::wstring caption;
-};
 class CDPI;
 #define GEOMETRY_COUNT 2
 class MetroWindow :public CWindowImpl<MetroWindow, CWindow, CMetroWindowTraits> {
@@ -88,16 +63,7 @@ private:
 	ID2D1Factory *m_pFactory;
 	ID2D1HwndRenderTarget* m_pHwndRenderTarget;
 	ID2D1SolidColorBrush* m_pSolidColorBrush;
-	//// Button Solid Color Brush
-	ID2D1SolidColorBrush* m_PushButtonNActiveBrush;
-	ID2D1SolidColorBrush* m_PushButtonActiveBrush;
-	ID2D1SolidColorBrush* m_PushButtonClickBrush;
-
-	ID2D1SolidColorBrush *m_pBakcgroundEdgeBrush;
-
-	ID2D1RadialGradientBrush *m_pRadialGradientBrush; ///// Radial Cycle
-	ID2D1EllipseGeometry* m_pEllipseArray[GEOMETRY_COUNT];
-	ID2D1GeometryGroup* m_pGeometryGroup;
+	ID2D1SolidColorBrush* m_AreaBorderBrush;
 
 	IDWriteTextFormat* m_pWriteTextFormat;
 	IDWriteFactory* m_pWriteFactory;
@@ -113,11 +79,37 @@ private:
 		UINT width,
 		UINT height
 		);
-	std::vector<MetroLabel> label_;
-	std::vector<MetroButton> button_;
-	std::vector<MetroTextItem> item_;
-	bool taskrunning_ = false;
+	std::vector<KryceLabel> label_;
+	std::wstring windowTitle;
+	bool requireCancel{ false };
+	bool isInstallFinalize{ false };
+	bool mEnableActionData{ false };
+	bool mForwardProgress{ false };
+	bool mScriptInProgress{ false };
+	int mProgressTotal{ 0 };
+	int mProgress{ 0 };
+	int iField[4];
+	int iCurPos;
+	void InstallValueReset()
+	{
+		requireCancel = false;
+		isInstallFinalize = false;
+		mEnableActionData = false ;
+		mForwardProgress = false;
+		mScriptInProgress = false;
+		mProgressTotal = 0;
+		 mProgress = 0;
+	}
+	std::mutex mtx;
 	Argument argument_;
+	HWND hUriEdit{ nullptr };
+	HWND hDirEdit{ nullptr };
+	HWND hUriButton{ nullptr };
+	HWND hDirButton{ nullptr };
+	HWND hProgress{ nullptr };
+	HWND hOK{ nullptr };
+	HWND hCancel{ nullptr };
+
 public:
 	MetroWindow();
 	~MetroWindow();
@@ -130,8 +122,10 @@ public:
 		MESSAGE_HANDLER(WM_SIZE, OnSize)
 		MESSAGE_HANDLER(WM_PAINT, OnPaint)
 		MESSAGE_HANDLER(WM_DROPFILES, OnDropfiles)
-		MESSAGE_HANDLER(WM_LBUTTONUP, OnLButtonUP)
-		MESSAGE_HANDLER(WM_LBUTTONDOWN, OnLButtonDown)
+		COMMAND_ID_HANDLER(IDC_PACKAGE_VIEW_BUTTON,OnDiscoverPackage)
+		COMMAND_ID_HANDLER(IDC_FOLDER_URI_BUTTON, OnDiscoverFolder)
+		COMMAND_ID_HANDLER(IDC_OPTION_BUTTON_OK,OnStartTask)
+		COMMAND_ID_HANDLER(IDC_OPTION_BUTTON_CANCEL,OnCancelTask)
 	END_MSG_MAP()
 	LRESULT OnCreate(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
 	LRESULT OnDestroy(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
@@ -139,13 +133,13 @@ public:
 	LRESULT OnSize(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
 	LRESULT OnPaint(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
 	LRESULT OnDropfiles(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL & bHandled);
-	LRESULT OnLButtonUP(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
-	LRESULT OnLButtonDown(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
-	LRESULT KrycekiumDiscoverPackageButtonActive(const wchar_t *debugMessage);
-	LRESULT KrycekiumDiscoverFolderButtonActive(const wchar_t *debugMessage);
-	LRESULT KrycekiumTaskRun(const wchar_t *debugMessage);
-	bool IsTaskRunning()const { return taskrunning_; }
-	void UnsetTaskIsRunning() { taskrunning_ = false; }
+	LRESULT OnDiscoverPackage(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);
+	LRESULT OnDiscoverFolder(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);
+	LRESULT OnStartTask(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);
+	LRESULT OnCancelTask(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);
+	int InstanllUIHandler(UINT iMessageType, LPCWSTR szMessage);
+	HWND ProgressHwnd()const { return hProgress; }
+	HWND MainHwnd()const { return m_hWnd; }
 	const Argument &Argum()const { return argument_; }
 	////
 };
