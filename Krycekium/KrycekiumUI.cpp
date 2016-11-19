@@ -170,7 +170,7 @@ MetroWindow::MetroWindow()
 	g_Dpi->SetAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 	KryceLabel ml = { { 30, 50, 120, 75 }, L"Package\t\xD83D\xDCE6:" };
 	KryceLabel ml2 = { { 30, 100, 120, 125 }, L"Folder\t\xD83D\xDCC1:" };
-	KryceLabel info = { { 120, 345, 540, 370 }, L"\x263B \x2665 Copyright \x0A9 2016.Force Charlie.All Rights Reserved." };
+	KryceLabel info = { { 125, 345, 540, 370 }, L"\x263B \x2665 Copyright \x0A9 2016.Force Charlie.All Rights Reserved." };
 	label_.push_back(std::move(ml));
 	label_.push_back(std::move(info));
 	label_.push_back(std::move(ml2));
