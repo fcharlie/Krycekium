@@ -505,8 +505,7 @@ inline bool FolderIsEmpty(const std::wstring &dir)
 LRESULT MetroWindow::OnStartTask(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
 {
 	if (!mtx.try_lock()) {
-		/// Task is running
-		//MessageWindowEx(m_hWnd, L"Task Running",L:)
+		MessageBeep(MB_ICONHAND);
 		return S_FALSE;
 	} else {
 		mtx.unlock();
