@@ -59,7 +59,6 @@ public:
 		std::wstring folder;
 	};
 private:
-	CDPI *g_Dpi;
 	ID2D1Factory *m_pFactory;
 	ID2D1HwndRenderTarget* m_pHwndRenderTarget;
 	ID2D1SolidColorBrush* m_pSolidColorBrush;
