@@ -67,7 +67,7 @@ bool KrycekiumDiscoverWindow(
 	hr = pWindow->GetResult(&pItem);
 	if (FAILED(hr))
 		goto done;
-	hr = pItem->GetDisplayName(SIGDN_URL, &pwszFilePath);
+	hr = pItem->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &pwszFilePath);
 	if (FAILED(hr)) { goto done; }
 	filename.assign(pwszFilePath);
 done:
