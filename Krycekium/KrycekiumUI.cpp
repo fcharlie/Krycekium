@@ -540,7 +540,7 @@ LRESULT MetroWindow::OnStartTask(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL&
 
 	argument_.packfile.assign(packfile, len);
 	argument_.folder.assign(folder, len);
-	InstallValueReset();
+	InstallContextReset();
 	std::wstring title(windowTitle);
 	title.append(L" (Running...)");
 	SetWindowTextW(title.c_str());
@@ -656,6 +656,10 @@ BOOL ParseProgressString(LPWSTR sz, int* pnFields)
 
 int MetroWindow::InstanllUIHandler(UINT iMessageType, LPCWSTR szMessage)
 {
+	if (mFirstTime ) {
+		UINT r1 = MsiSetInternalUI(INSTALLUILEVEL_BASIC, NULL);
+		mFirstTime = false;
+	}
 	if (requireCancel)
 		return IDCANCEL;
 	if (!szMessage)

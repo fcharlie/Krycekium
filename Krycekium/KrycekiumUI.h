@@ -82,7 +82,7 @@ private:
 	std::vector<KryceLabel> label_;
 	std::wstring windowTitle;
 	bool requireCancel{ false };
-	bool isInstallFinalize{ false };
+	bool mFirstTime{ true };
 	bool mEnableActionData{ false };
 	bool mForwardProgress{ false };
 	bool mScriptInProgress{ false };
@@ -90,15 +90,14 @@ private:
 	int mProgress{ 0 };
 	int iField[4];
 	int iCurPos;
-	void InstallValueReset()
+	void InstallContextReset()
 	{
 		requireCancel = false;
-		isInstallFinalize = false;
 		mEnableActionData = false ;
 		mForwardProgress = false;
 		mScriptInProgress = false;
 		mProgressTotal = 0;
-		 mProgress = 0;
+		mProgress = 0;
 	}
 	std::mutex mtx;
 	Argument argument_;
