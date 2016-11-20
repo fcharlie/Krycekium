@@ -18,6 +18,7 @@
 #include <functional>
 #include <mutex>
 
+#define IDM_KRYCEKIUM_ABOUT 1001
 #define IDC_PACKAGE_URI_EDIT 1010
 #define IDC_PACKAGE_VIEW_BUTTON 1011
 #define IDC_FOLDER_URI_EDIT 1012
@@ -25,6 +26,18 @@
 #define IDC_PROCESS_RATE 1014
 #define IDC_OPTION_BUTTON_OK 1015
 #define IDC_OPTION_BUTTON_CANCEL 1016
+
+#ifndef SYSCOMMAND_ID_HANDLER
+#define SYSCOMMAND_ID_HANDLER(id, func) \
+	if(uMsg == WM_SYSCOMMAND && id == LOWORD(wParam)) \
+					{ \
+		bHandled = TRUE; \
+		lResult = func(HIWORD(wParam), LOWORD(wParam), (HWND)lParam, bHandled); \
+		if(bHandled) \
+			return TRUE; \
+					}
+#endif
+
 
 bool KrycekiumDiscoverWindow(
 	HWND hParent,
@@ -37,7 +50,9 @@ bool KrycekiumFolderOpenWindow(
 	const wchar_t *pszWindowTitle);
 
 #define KRYCEKIUM_UI_MAINWINDOW _T("Krycekium.Render.UI.Window")
-typedef CWinTraits<WS_OVERLAPPEDWINDOW, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE> CMetroWindowTraits;
+#define KRYCEKIUM_MAIN_CLASSSTYLE WS_OVERLAPPED | WS_SYSMENU | \
+WS_MINIMIZEBOX | WS_CLIPCHILDREN | WS_CLIPSIBLINGS&~WS_MAXIMIZEBOX
+typedef CWinTraits<KRYCEKIUM_MAIN_CLASSSTYLE, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE> CMetroWindowTraits;
 
 struct KryceLabel {
 	RECT layout;
@@ -119,7 +134,9 @@ public:
 		MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
 		MESSAGE_HANDLER(WM_SIZE, OnSize)
 		MESSAGE_HANDLER(WM_PAINT, OnPaint)
+		MESSAGE_HANDLER(WM_DISPLAYCHANGE, OnDisplayChange)
 		MESSAGE_HANDLER(WM_DROPFILES, OnDropfiles)
+		SYSCOMMAND_ID_HANDLER(IDM_KRYCEKIUM_ABOUT,OnKrycekiumAbout)
 		COMMAND_ID_HANDLER(IDC_PACKAGE_VIEW_BUTTON,OnDiscoverPackage)
 		COMMAND_ID_HANDLER(IDC_FOLDER_URI_BUTTON, OnDiscoverFolder)
 		COMMAND_ID_HANDLER(IDC_OPTION_BUTTON_OK,OnStartTask)
@@ -130,7 +147,9 @@ public:
 	LRESULT OnClose(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
 	LRESULT OnSize(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
 	LRESULT OnPaint(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
+	LRESULT OnDisplayChange(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL & bHandled);
 	LRESULT OnDropfiles(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL & bHandled);
+	LRESULT OnKrycekiumAbout(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);
 	LRESULT OnDiscoverPackage(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);
 	LRESULT OnDiscoverFolder(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);
 	LRESULT OnStartTask(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);

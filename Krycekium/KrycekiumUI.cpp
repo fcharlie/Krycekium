@@ -31,10 +31,8 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define HINST_THISCOMPONENT ((HINSTANCE)&__ImageBase)
 #endif
 
-#define WS_NORESIZEWINDOW (WS_OVERLAPPED     | \
-                             WS_CAPTION        | \
-                             WS_SYSMENU        | \
-                             WS_MINIMIZEBOX )
+#define WS_NORESIZEWINDOW (WS_OVERLAPPED | WS_CAPTION |WS_SYSMENU | \
+ WS_CLIPCHILDREN | WS_MINIMIZEBOX )
 
 template<class Interface>
 inline void
@@ -106,6 +104,23 @@ HRESULT MetroWindow::CreateDeviceIndependentResources()
 {
 	HRESULT hr = S_OK;
 	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pFactory);
+	if (SUCCEEDED(hr)) {
+		hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,
+								 __uuidof(IDWriteFactory),
+								 reinterpret_cast<IUnknown**>(&m_pWriteFactory));
+		if (SUCCEEDED(hr)) {
+			hr = m_pWriteFactory->CreateTextFormat(
+				L"Segoe UI",
+				NULL,
+				DWRITE_FONT_WEIGHT_NORMAL,
+				DWRITE_FONT_STYLE_NORMAL,
+				DWRITE_FONT_STRETCH_NORMAL,
+				12.0f * 96.0f / 72.0f,
+				L"zh-CN",
+				&m_pWriteTextFormat);
+		}
+
+	}
 	return hr;
 }
 HRESULT MetroWindow::Initialize()
@@ -150,51 +165,40 @@ HRESULT MetroWindow::CreateDeviceResources()
 void MetroWindow::DiscardDeviceResources()
 {
 	SafeRelease(&m_pSolidColorBrush);
+	SafeRelease(&m_AreaBorderBrush);
 }
 HRESULT MetroWindow::OnRender()
 {
 	auto hr = CreateDeviceResources();
-	hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,
-							 __uuidof(IDWriteFactory),
-							 reinterpret_cast<IUnknown**>(&m_pWriteFactory));
-	if (hr != S_OK) return hr;
-	hr = m_pWriteFactory->CreateTextFormat(
-		L"Segoe UI",
-		NULL,
-		DWRITE_FONT_WEIGHT_NORMAL,
-		DWRITE_FONT_STYLE_NORMAL,
-		DWRITE_FONT_STRETCH_NORMAL,
-		12.0f * 96.0f / 72.0f,
-		L"zh-CN",
-		&m_pWriteTextFormat);
+	if (SUCCEEDED(hr)) {
 #pragma warning(disable:4244)
 #pragma warning(disable:4267)
-	if (SUCCEEDED(hr)) {
-		RECT rect;
-		GetClientRect(&rect);
-		m_pHwndRenderTarget->BeginDraw();
-		m_pHwndRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
-		m_pHwndRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White, 1.0f));
-		m_pHwndRenderTarget->DrawRectangle(D2D1::RectF(20, 10, rect.right - rect.left - 20, 155), m_AreaBorderBrush, 1.0);
-		m_pHwndRenderTarget->DrawRectangle(D2D1::RectF(20, 155, rect.right - rect.left - 20, rect.bottom-rect.top-20), m_AreaBorderBrush, 1.0);
-		for (auto &label : label_) {
-			if (label.text.empty())
-				continue;
-			m_pHwndRenderTarget->DrawTextW(label.text.c_str(),
-										   label.text.size(),
-										   m_pWriteTextFormat,
-										   D2D1::RectF(label.layout.left, label.layout.top, label.layout.right, label.layout.bottom),
-										   m_pSolidColorBrush,
-										   D2D1_DRAW_TEXT_OPTIONS_NONE, DWRITE_MEASURING_MODE_NATURAL);
+		if (SUCCEEDED(hr)) {
+			auto size = m_pHwndRenderTarget->GetSize();
+			m_pHwndRenderTarget->BeginDraw();
+			m_pHwndRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+			m_pHwndRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White, 1.0f));
+			m_pHwndRenderTarget->DrawRectangle(D2D1::RectF(20, 10, size.width - 20, 155), m_AreaBorderBrush, 1.0);
+			m_pHwndRenderTarget->DrawRectangle(D2D1::RectF(20, 155, size.width- 20, size.height - 20), m_AreaBorderBrush, 1.0);
+			for (auto &label : label_) {
+				if (label.text.empty())
+					continue;
+				m_pHwndRenderTarget->DrawTextW(label.text.c_str(),
+											   label.text.size(),
+											   m_pWriteTextFormat,
+											   D2D1::RectF(label.layout.left, label.layout.top, label.layout.right, label.layout.bottom),
+											   m_pSolidColorBrush,
+											   D2D1_DRAW_TEXT_OPTIONS_NONE, DWRITE_MEASURING_MODE_NATURAL);
+			}
+			hr = m_pHwndRenderTarget->EndDraw();
 		}
-		hr = m_pHwndRenderTarget->EndDraw();
-	}
+		if (hr == D2DERR_RECREATE_TARGET) {
+			hr = S_OK;
+			DiscardDeviceResources();
+			//::InvalidateRect(m_hWnd, nullptr, FALSE);
+		}
 #pragma warning(default:4244)
 #pragma warning(default:4267)	
-	if (hr == D2DERR_RECREATE_TARGET) {
-		hr = S_OK;
-		DiscardDeviceResources();
-		::InvalidateRect(m_hWnd, nullptr, FALSE);
 	}
 	return hr;
 }
@@ -270,6 +274,8 @@ LRESULT MetroWindow::OnCreate(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHa
 		}
 		return hw;
 	};
+	HMENU hSystemMenu = ::GetSystemMenu(m_hWnd, FALSE);
+	InsertMenuW(hSystemMenu, SC_CLOSE, MF_ENABLED, IDM_KRYCEKIUM_ABOUT, L"About Krycekium\tAlt+F1");
 	hUriEdit = LambdaCreateWindowEdge(WC_EDITW, L"", EDITBOXSTYLE, 125, 50, 420, 27, HMENU(IDC_PACKAGE_URI_EDIT));
 	hDirEdit = LambdaCreateWindowEdge(WC_EDITW, L"", EDITBOXSTYLE, 125, 100, 420, 27, HMENU(IDC_FOLDER_URI_EDIT));
 	hUriButton = LambdaCreateWindow(WC_BUTTONW, L"View...", PUSHBUTTONSTYLE, 560, 50, 90, 27,HMENU(IDC_PACKAGE_VIEW_BUTTON));
@@ -308,13 +314,23 @@ LRESULT MetroWindow::OnSize(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHand
 }
 LRESULT MetroWindow::OnPaint(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle)
 {
-	LRESULT hr = S_OK;
-	PAINTSTRUCT ps;
-	BeginPaint(&ps);
-	/// if auto return OnRender(),CPU usage is too high
-	hr = OnRender();
-	EndPaint(&ps);
-	return hr;
+	OnRender();
+	ValidateRect(NULL);
+	return S_OK;
+	//LRESULT hr = S_OK;
+	//PAINTSTRUCT ps;
+	//BeginPaint(&ps);
+	///// if auto return OnRender(),CPU usage is too high
+	//hr = OnRender();
+	//EndPaint(&ps);
+	////ValidateRect(NULL);
+	//return hr;
+}
+
+LRESULT MetroWindow::OnDisplayChange(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL & bHandled)
+{
+	::InvalidateRect(m_hWnd, NULL, FALSE);
+	return S_OK;
 }
 
 LRESULT MetroWindow::OnDropfiles(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL & bHandled)
@@ -334,7 +350,17 @@ LRESULT MetroWindow::OnDropfiles(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &
 		}
 	}
 	DragFinish(hDrop);
-	::InvalidateRect(m_hWnd, NULL, TRUE);
+	return S_OK;
+}
+
+LRESULT MetroWindow::OnKrycekiumAbout(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
+{
+	MessageWindowEx(
+		m_hWnd,
+		L"About Krycekium Installer",
+		L"Prerelease: 1.0.0.0\nCopyright \xA9 2016, Force Charlie. All Rights Reserved.",
+		L"For more information about this tool.\nVisit: <a href=\"http://forcemz.net/\">forcemz.net</a>",
+		kAboutWindow);
 	return S_OK;
 }
 

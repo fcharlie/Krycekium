@@ -44,8 +44,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance,
 					_In_ LPWSTR    lpCmdLine,
 					_In_ int       nCmdShow)
 {
-	if (!IsWindows8Point1OrGreater()) {
-		MessageBoxW(nullptr, L"You need at least Windows 8.1", L"Not Supported", MB_OK | MB_ICONERROR);
+	if (!IsWindows7SP1OrGreater()) {
+		MessageBoxW(nullptr, L"You need at least Windows 7", 
+					L"Please upgrade Your OS to Windows 7 or Windows 10", 
+					MB_OK | MB_ICONERROR);
 		return -1;
 	}
 	DotComInitialize dot;
