@@ -41,36 +41,46 @@ bool KrycekiumDiscoverWindow(
 	std::wstring &filename,
 	const wchar_t *pszWindowTitle)
 {
-	HRESULT hr;
-	bool br = false;
-	CComPtr<IFileOpenDialog> pWindow;
-	// Create the file-open dialog COM object.
-	hr = pWindow.CoCreateInstance(__uuidof(FileOpenDialog));
-	if (FAILED(hr)) {
+	HRESULT hr=S_OK;
+	IFileOpenDialog *pWindow = nullptr;
+	IShellItem *pItem = nullptr;
+	PWSTR pwszFilePath = nullptr;
+	if (CoCreateInstance(
+		__uuidof(FileOpenDialog),
+		NULL,
+		CLSCTX_INPROC_SERVER,
+		IID_PPV_ARGS(&pWindow)
+		) != S_OK) {
 		ReportErrorMessage(L"FileOpenWindowProvider", hr);
 		return false;
 	}
-
-	// Set the dialog's caption text and the available file types.
-	// NOTE: Error handling omitted here for clarity.
 	hr = pWindow->SetFileTypes(sizeof(filterSpec) / sizeof(filterSpec[0]), filterSpec);
 	hr = pWindow->SetFileTypeIndex(1);
-	pWindow->SetTitle(pszWindowTitle ? pszWindowTitle : L"Open File Provider");
+	hr = pWindow->SetTitle(pszWindowTitle ? pszWindowTitle : L"Open File Provider");
 	hr = pWindow->Show(hParent);
-	if (SUCCEEDED(hr)) {
-		CComPtr<IShellItem> pItem;
-		hr = pWindow->GetResult(&pItem);
-		if (SUCCEEDED(hr)) {
-			PWSTR pwsz = NULL;
-			hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pwsz);
-			if (SUCCEEDED(hr)) {
-				filename = pwsz;
-				br = true;
-				CoTaskMemFree(pwsz);
-			}
-		}
+	if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+		// User cancelled.
+		hr = S_OK;
+		goto done;
 	}
-	return br;
+	if (FAILED(hr)) { goto done; }
+	hr = pWindow->GetResult(&pItem);
+	if (FAILED(hr))
+		goto done;
+	hr = pItem->GetDisplayName(SIGDN_URL, &pwszFilePath);
+	if (FAILED(hr)) { goto done; }
+	filename.assign(pwszFilePath);
+done:
+	if (pwszFilePath) {
+		CoTaskMemFree(pwszFilePath);
+	}
+	if (pItem) {
+		pItem->Release();
+	}
+	if (pWindow) {
+		pWindow->Release();
+	}
+	return hr==S_OK;
 }
 
 bool KrycekiumFolderOpenWindow(
@@ -78,14 +88,15 @@ bool KrycekiumFolderOpenWindow(
 	std::wstring &folder,
 	const wchar_t *pszWindowTitle)
 {
-	IFileDialog *pfd;
+	IFileDialog *pfd=nullptr;
 	HRESULT hr = S_OK;
 	bool bRet = false;
 	if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd)))) {
 		DWORD dwOptions;
-		if (SUCCEEDED(pfd->GetOptions(&dwOptions))) {
-			pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
+		if (!SUCCEEDED(pfd->GetOptions(&dwOptions))) {
+			return false;
 		}
+		pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
 		pfd->SetTitle(pszWindowTitle ? pszWindowTitle : L"Open Folder");
 		if (SUCCEEDED(pfd->Show(hParent))) {
 			IShellItem *psi;
