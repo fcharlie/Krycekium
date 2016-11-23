@@ -3,16 +3,18 @@
 // Used by PEAnalyzer.rc
 //
 
+#define IDI_KRYCEKIUM           501
+#define IDI_KRYCEKIUM_WIN	    502
+
 #define IDS_APP_TITLE			1001
 
-#define IDR_MAINFRAME			2001
+#define IDR_MAINFRAME			1001
 #define IDC_KRYCEKIUM_DIALOG	1002
 #define IDD_ABOUTBOX			1003
 #define IDM_ABOUT				1004
 #define IDM_EXIT				1005
-#define IDI_KRYCEKIUM			1007
-#define IDI_SMALL				1008
-#define IDC_KRYCEKIUM			1009
+#define IDI_SMALL				1006
+#define IDC_KRYCEKIUM			1007
 
 
 #define IDC_MYICON				2
