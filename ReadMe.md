@@ -29,10 +29,10 @@ UINT WINAPI MsiInstallProductW(
 
 Running:
 
-![Running](./doc/images/running.png)
+![Running](./docs/images/running.png)
 
 Completed:
 
-![Completed](./doc/images/completed.png)
+![Completed](./docs/images/completed.png)
 
 
