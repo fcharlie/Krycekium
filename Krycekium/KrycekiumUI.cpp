@@ -71,7 +71,7 @@ MetroWindow::MetroWindow()
 {
 	KryceLabel ml = { { 30, 50, 120, 75 }, L"Package\t\xD83D\xDCE6:" };
 	KryceLabel ml2 = { { 30, 100, 120, 125 }, L"Folder\t\xD83D\xDCC1:" };
-	KryceLabel info = { { 125, 345, 540, 370 }, L"\x263B \x2665 Copyright \x0A9 2016.Force Charlie.All Rights Reserved." };
+	KryceLabel info = { { 125, 345, 540, 370 }, L"\x263B \x2665 Copyright \x0A9 2017.Force Charlie.All Rights Reserved." };
 	label_.push_back(std::move(ml));
 	label_.push_back(std::move(info));
 	label_.push_back(std::move(ml2));
@@ -358,7 +358,7 @@ LRESULT MetroWindow::OnKrycekiumAbout(WORD wNotifyCode, WORD wID, HWND hWndCtl, 
 	MessageWindowEx(
 		m_hWnd,
 		L"About Krycekium Installer",
-		L"Prerelease: 1.0.0.0\nCopyright \xA9 2016, Force Charlie. All Rights Reserved.",
+		L"Prerelease: 1.0.0.0\nCopyright \xA9 2017, Force Charlie. All Rights Reserved.",
 		L"For more information about this tool.\nVisit: <a href=\"http://forcemz.net/\">forcemz.net</a>",
 		kAboutWindow);
 	return S_OK;
