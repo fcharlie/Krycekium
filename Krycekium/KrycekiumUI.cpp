@@ -188,7 +188,7 @@ HRESULT MetroWindow::OnRender()
 											   m_pWriteTextFormat,
 											   D2D1::RectF(label.layout.left, label.layout.top, label.layout.right, label.layout.bottom),
 											   m_pSolidColorBrush,
-											   D2D1_DRAW_TEXT_OPTIONS_NONE, DWRITE_MEASURING_MODE_NATURAL);
+											   D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT , DWRITE_MEASURING_MODE_NATURAL);
 			}
 			hr = m_pHwndRenderTarget->EndDraw();
 		}
