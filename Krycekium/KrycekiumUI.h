@@ -88,12 +88,13 @@ private:
 	void DiscardDeviceResources();
 	HRESULT OnRender();
 	D2D1_SIZE_U CalculateD2DWindowSize();
-	void KcycekiumFolderSet(const std::wstring &package);
+	//void KcycekiumFolderSet(const std::wstring &package);
 	void OnResize(
 		UINT width,
 		UINT height
 		);
 	std::vector<KryceLabel> label_;
+	KryceLabel info;
 	std::wstring windowTitle;
 	bool requireCancel{ false };
 	bool mFirstTime{ true };
