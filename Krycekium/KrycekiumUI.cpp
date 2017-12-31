@@ -60,7 +60,7 @@ MetroWindow::MetroWindow()
   label_.push_back(std::move(ml));
   label_.push_back(std::move(ml2));
   info = {{125, 345, 600, 370},
-          L"\xD83D\xDE0B \x2764 Copyright \x0A9 2017.Force Charlie.All Rights "
+          L"\xD83D\xDE0B \x2764 Copyright \x0A9 2018.Force Charlie.All Rights "
           L"Reserved."};
 }
 MetroWindow::~MetroWindow() {
@@ -346,7 +346,7 @@ LRESULT MetroWindow::OnDropfiles(UINT nMsg, WPARAM wParam, LPARAM lParam,
 LRESULT MetroWindow::OnKrycekiumAbout(WORD wNotifyCode, WORD wID, HWND hWndCtl,
                                       BOOL &bHandled) {
   MessageWindowEx(m_hWnd, L"About Krycekium Installer",
-                  L"Prerelease: 1.0.0.0\nCopyright \xA9 2017, Force Charlie. "
+                  L"Prerelease: 1.0.0.0\nCopyright \xA9 2018, Force Charlie. "
                   L"All Rights Reserved.",
                   L"For more information about this tool.\nVisit: <a "
                   L"href=\"http://forcemz.net/\">forcemz.net</a>",
