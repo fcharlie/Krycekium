@@ -60,7 +60,7 @@ MetroWindow::MetroWindow()
   label_.push_back(std::move(ml));
   label_.push_back(std::move(ml2));
   info = {{125, 345, 600, 370},
-          L"\xD83D\xDE0B \x2764 Copyright \x0A9 2018.Force Charlie.All Rights "
+          L"\xD83D\xDE0B \x2764 Copyright \x0A9 2018, Force Charlie. All Rights "
           L"Reserved."};
 }
 MetroWindow::~MetroWindow() {
