@@ -1,14 +1,14 @@
 #include "stdafx.h"
-#include <string>
-#include <Uxtheme.h>
 #include <ShlObj.h>
-#include <tchar.h>
-#include <strsafe.h>
+#include <Uxtheme.h>
 #include <atlbase.h>
-#include <atlwin.h>
 #include <atlcoll.h>
-#include <atlstr.h>
 #include <atlsimpstr.h>
+#include <atlstr.h>
+#include <atlwin.h>
+#include <string>
+#include <strsafe.h>
+#include <tchar.h>
 #pragma warning(disable : 4091)
 #include <Shlwapi.h>
 

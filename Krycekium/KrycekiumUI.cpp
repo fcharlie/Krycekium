@@ -2,20 +2,20 @@
 //
 //
 #include "stdafx.h"
-#include "KrycekiumUI.h"
-#include <d2d1helper.h>
-#include <Prsht.h>
 #include <CommCtrl.h>
-#include <Shlwapi.h>
-#include <Shellapi.h>
-#include <PathCch.h>
 #include <Mmsystem.h>
-#include <vector>
-#include <thread>
-#include <future>
 #include <Msi.h>
-#include "Resource.h"
+#include <PathCch.h>
+#include <Prsht.h>
+#include <Shellapi.h>
+#include <Shlwapi.h>
+#include <d2d1helper.h>
+#include <future>
+#include <thread>
+#include <vector>
+#include "KrycekiumUI.h"
 #include "MessageWindow.h"
+#include "Resource.h"
 
 //#include <exception>
 #pragma comment(lib, "Comctl32.lib")
@@ -50,6 +50,98 @@ int RectWidth(RECT Rect) { return Rect.right - Rect.left; }
 /*
  * Resources Initialize and Release
  */
+class CDPI {
+public:
+  CDPI() {
+    m_nScaleFactor = 0;
+    m_nScaleFactorSDA = 0;
+    m_Awareness = PROCESS_DPI_UNAWARE;
+  }
+
+  int Scale(int x) {
+    // DPI Unaware:  Return the input value with no scaling.
+    // These apps are always virtualized to 96 DPI and scaled by the system for
+    // the DPI of the monitor where shown.
+    if (m_Awareness == PROCESS_DPI_UNAWARE) {
+      return x;
+    }
+
+    // System DPI Aware:  Return the input value scaled by the factor determined
+    // by the system DPI when the app was launched. These apps render themselves
+    // according to the DPI of the display where they are launched, and they
+    // expect that scaling to remain constant for all displays on the system.
+    // These apps are scaled up or down when moved to a display with a different
+    // DPI from the system DPI.
+    if (m_Awareness == PROCESS_SYSTEM_DPI_AWARE) {
+      return MulDiv(x, m_nScaleFactorSDA, 100);
+    }
+
+    // Per-Monitor DPI Aware:  Return the input value scaled by the factor for
+    // the display which contains most of the window. These apps render
+    // themselves for any DPI, and re-render when the DPI changes (as indicated
+    // by the WM_DPICHANGED window message).
+    return MulDiv(x, m_nScaleFactor, 100);
+  }
+
+  UINT GetScale() {
+    if (m_Awareness == PROCESS_DPI_UNAWARE) {
+      return 100;
+    }
+
+    if (m_Awareness == PROCESS_SYSTEM_DPI_AWARE) {
+      return m_nScaleFactorSDA;
+    }
+
+    return m_nScaleFactor;
+  }
+
+  void SetScale(__in UINT iDPI) {
+    m_nScaleFactor = MulDiv(iDPI, 100, 96);
+    if (m_nScaleFactorSDA == 0) {
+      m_nScaleFactorSDA = m_nScaleFactor; // Save the first scale factor, which
+                                          // is all that SDA apps know about
+    }
+    return;
+  }
+
+  PROCESS_DPI_AWARENESS GetAwareness() {
+    HANDLE hProcess;
+    hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, GetCurrentProcessId());
+    GetProcessDpiAwareness(hProcess, &m_Awareness);
+    return m_Awareness;
+  }
+
+  void SetAwareness(PROCESS_DPI_AWARENESS awareness) {
+    HRESULT hr = E_FAIL;
+    hr = SetProcessDpiAwareness(awareness);
+    auto l = E_INVALIDARG;
+    if (hr == S_OK) {
+      m_Awareness = awareness;
+    } else {
+      MessageBoxW(NULL, L"SetProcessDpiAwareness Error", L"Error", MB_OK);
+    }
+    return;
+  }
+
+  // Scale rectangle from raw pixels to relative pixels.
+  void ScaleRect(__inout RECT *pRect) {
+    pRect->left = Scale(pRect->left);
+    pRect->right = Scale(pRect->right);
+    pRect->top = Scale(pRect->top);
+    pRect->bottom = Scale(pRect->bottom);
+  }
+
+  // Scale Point from raw pixels to relative pixels.
+  void ScalePoint(__inout POINT *pPoint) {
+    pPoint->x = Scale(pPoint->x);
+    pPoint->y = Scale(pPoint->y);
+  }
+
+private:
+  UINT m_nScaleFactor;
+  UINT m_nScaleFactorSDA;
+  PROCESS_DPI_AWARENESS m_Awareness;
+};
 
 MetroWindow::MetroWindow()
     : m_pFactory(nullptr), m_pHwndRenderTarget(nullptr),
@@ -59,9 +151,12 @@ MetroWindow::MetroWindow()
   KryceLabel ml2 = {{30, 100, 120, 125}, L"Folder\t\xD83D\xDCC1:"};
   label_.push_back(std::move(ml));
   label_.push_back(std::move(ml2));
-  info = {{125, 345, 600, 370},
-          L"\xD83D\xDE0B \x2764 Copyright \x0A9 2018, Force Charlie. All Rights "
-          L"Reserved."};
+  info = {
+      {125, 345, 600, 370},
+      L"\xD83D\xDE0B \x2764 Copyright \x0A9 2018, Force Charlie. All Rights "
+      L"Reserved."};
+  dpi_ = std::make_unique<CDPI>();
+  dpi_->SetAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 }
 MetroWindow::~MetroWindow() {
   SafeRelease(&m_pWriteTextFormat);
@@ -71,11 +166,31 @@ MetroWindow::~MetroWindow() {
   SafeRelease(&m_AreaBorderBrush);
   SafeRelease(&m_pHwndRenderTarget);
   SafeRelease(&m_pFactory);
+  if (hFont != nullptr) {
+    DeleteFont(hFont);
+  }
 }
 
 LRESULT MetroWindow::InitializeWindow() {
+  HMONITOR hMonitor;
+  POINT pt;
+  UINT dpix = 0, dpiy = 0;
   HRESULT hr = E_FAIL;
-  RECT layout = {100, 100, 800, 540};
+
+  // Get the DPI for the main monitor, and set the scaling factor
+  pt.x = 1;
+  pt.y = 1;
+  hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+  hr = GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
+
+  if (hr != S_OK) {
+    ::MessageBox(NULL, (LPCWSTR)L"GetDpiForMonitor failed",
+                 (LPCWSTR)L"Notification", MB_OK);
+    return FALSE;
+  }
+  dpi_->SetScale(dpix);
+  RECT layout = {dpi_->Scale(100), dpi_->Scale(100), dpi_->Scale(800),
+                 dpi_->Scale(540)};
   windowTitle.assign(L"Krycekium Installer");
   Create(nullptr, layout, windowTitle.c_str(), WS_NORESIZEWINDOW,
          WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
@@ -101,8 +216,6 @@ HRESULT MetroWindow::CreateDeviceIndependentResources() {
 }
 HRESULT MetroWindow::Initialize() {
   auto hr = CreateDeviceIndependentResources();
-  FLOAT dpiX, dpiY;
-  m_pFactory->GetDesktopDpi(&dpiX, &dpiY);
   return hr;
 }
 HRESULT MetroWindow::CreateDeviceResources() {
@@ -221,13 +334,13 @@ LRESULT MetroWindow::OnCreate(UINT nMsg, WPARAM wParam, LPARAM lParam,
   ChangeWindowMessageFilter(0x0049, MSGFLT_ADD);
   ::DragAcceptFiles(m_hWnd, TRUE);
 
-  HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+  hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
   LOGFONT logFont = {0};
   GetObjectW(hFont, sizeof(logFont), &logFont);
   DeleteObject(hFont);
-  hFont = NULL;
+  hFont = nullptr;
 
-  logFont.lfHeight = 20;
+  logFont.lfHeight = dpi_->Scale(20);
   logFont.lfWeight = FW_NORMAL;
   wcscpy_s(logFont.lfFaceName, L"Segoe UI");
   hFont = CreateFontIndirectW(&logFont);
@@ -235,8 +348,9 @@ LRESULT MetroWindow::OnCreate(UINT nMsg, WPARAM wParam, LPARAM lParam,
                                 DWORD dwStyle, int X, int Y, int nWidth,
                                 int nHeight, HMENU hMenu) -> HWND {
     auto hw = CreateWindowExW(WINDOWEXSTYLE, lpClassName, lpWindowName, dwStyle,
-                              X, Y, nWidth, nHeight, m_hWnd, hMenu,
-                              HINST_THISCOMPONENT, nullptr);
+                              dpi_->Scale(X), dpi_->Scale(Y),
+                              dpi_->Scale(nWidth), dpi_->Scale(nHeight), m_hWnd,
+                              hMenu, HINST_THISCOMPONENT, nullptr);
     if (hw) {
       ::SendMessageW(hw, WM_SETFONT, (WPARAM)hFont, lParam);
     }
@@ -245,9 +359,10 @@ LRESULT MetroWindow::OnCreate(UINT nMsg, WPARAM wParam, LPARAM lParam,
   auto LambdaCreateWindowEdge = [&](LPCWSTR lpClassName, LPCWSTR lpWindowName,
                                     DWORD dwStyle, int X, int Y, int nWidth,
                                     int nHeight, HMENU hMenu) -> HWND {
-    auto hw = CreateWindowExW(WINDOWEXSTYLE | WS_EX_CLIENTEDGE, lpClassName,
-                              lpWindowName, dwStyle, X, Y, nWidth, nHeight,
-                              m_hWnd, hMenu, HINST_THISCOMPONENT, nullptr);
+    auto hw = CreateWindowExW(
+        WINDOWEXSTYLE | WS_EX_CLIENTEDGE, lpClassName, lpWindowName, dwStyle,
+        dpi_->Scale(X), dpi_->Scale(Y), dpi_->Scale(nWidth),
+        dpi_->Scale(nHeight), m_hWnd, hMenu, HINST_THISCOMPONENT, nullptr);
     if (hw) {
       ::SendMessageW(hw, WM_SETFONT, (WPARAM)hFont, lParam);
     }
@@ -313,6 +428,52 @@ LRESULT MetroWindow::OnPaint(UINT nMsg, WPARAM wParam, LPARAM lParam,
   // EndPaint(&ps);
   ////ValidateRect(NULL);
   // return hr;
+}
+
+LRESULT MetroWindow::OnDpiChanged(UINT nMsg, WPARAM wParam, LPARAM lParam,
+                                  BOOL &bHandle) {
+  HMONITOR hMonitor;
+  POINT pt;
+  UINT dpix = 0, dpiy = 0;
+  HRESULT hr = E_FAIL;
+
+  // Get the DPI for the main monitor, and set the scaling factor
+  pt.x = 1;
+  pt.y = 1;
+  hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+  hr = GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
+
+  if (hr != S_OK) {
+    ::MessageBox(NULL, (LPCWSTR)L"GetDpiForMonitor failed",
+                 (LPCWSTR)L"Notification", MB_OK);
+    return FALSE;
+  }
+  dpi_->SetScale(dpix);
+  LOGFONTW logFont = {0};
+  GetObjectW(hFont, sizeof(logFont), &logFont);
+  DeleteObject(hFont);
+  hFont = nullptr;
+  logFont.lfHeight = dpi_->Scale(19);
+  logFont.lfWeight = FW_NORMAL;
+  wcscpy_s(logFont.lfFaceName, L"Segoe UI");
+  hFont = CreateFontIndirectW(&logFont);
+  auto UpdateWindowPos = [&](HWND hWnd) {
+    RECT rect;
+    ::GetClientRect(hWnd, &rect);
+    ::SetWindowPos(hWnd, NULL, dpi_->Scale(rect.left), dpi_->Scale(rect.top),
+                   dpi_->Scale(rect.right - rect.left),
+                   dpi_->Scale(rect.bottom - rect.top),
+                   SWP_NOZORDER | SWP_NOACTIVATE);
+    ::SendMessageW(hWnd, WM_SETFONT, (WPARAM)hFont, lParam);
+  };
+  UpdateWindowPos(hUriEdit);
+  UpdateWindowPos(hDirEdit);
+  UpdateWindowPos(hUriButton);
+  UpdateWindowPos(hDirButton);
+  UpdateWindowPos(hProgress);
+  UpdateWindowPos(hOK);
+  UpdateWindowPos(hCancel);
+  return S_OK;
 }
 
 LRESULT MetroWindow::OnDisplayChange(UINT nMsg, WPARAM wParam, LPARAM lParam,

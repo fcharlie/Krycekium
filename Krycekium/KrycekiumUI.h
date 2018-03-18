@@ -7,16 +7,16 @@
 #define KRYCEKIUM_UI_H
 
 #include <atlbase.h>
-#include <atlwin.h>
 #include <atlctl.h>
-#include <string>
+#include <atlwin.h>
 #include <d2d1.h>
 #include <d2d1helper.h>
 #include <dwrite.h>
-#include <wincodec.h>
-#include <vector>
 #include <functional>
 #include <mutex>
+#include <string>
+#include <vector>
+#include <wincodec.h>
 
 #define IDM_KRYCEKIUM_ABOUT 1001
 #define IDC_PACKAGE_URI_EDIT 1010
@@ -64,6 +64,7 @@ struct KryceText {
 
 class CDPI;
 #define GEOMETRY_COUNT 2
+
 class MetroWindow
     : public CWindowImpl<MetroWindow, CWindow, CMetroWindowTraits> {
 public:
@@ -92,6 +93,7 @@ private:
   std::vector<KryceLabel> label_;
   KryceLabel info;
   std::wstring windowTitle;
+  std::unique_ptr<CDPI> dpi_;
   bool requireCancel{false};
   bool mFirstTime{true};
   bool mEnableActionData{false};
@@ -111,6 +113,7 @@ private:
   }
   std::mutex mtx;
   Argument argument_;
+  HFONT hFont{nullptr};
   HWND hUriEdit{nullptr};
   HWND hDirEdit{nullptr};
   HWND hUriButton{nullptr};
@@ -130,6 +133,7 @@ public:
   MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
   MESSAGE_HANDLER(WM_SIZE, OnSize)
   MESSAGE_HANDLER(WM_PAINT, OnPaint)
+  MESSAGE_HANDLER(WM_DPICHANGED, OnDpiChanged)
   MESSAGE_HANDLER(WM_DISPLAYCHANGE, OnDisplayChange)
   MESSAGE_HANDLER(WM_DROPFILES, OnDropfiles)
   SYSCOMMAND_ID_HANDLER(IDM_KRYCEKIUM_ABOUT, OnKrycekiumAbout)
@@ -143,6 +147,7 @@ public:
   LRESULT OnClose(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
   LRESULT OnSize(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
   LRESULT OnPaint(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
+  LRESULT OnDpiChanged(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandle);
   LRESULT OnDisplayChange(UINT nMsg, WPARAM wParam, LPARAM lParam,
                           BOOL &bHandled);
   LRESULT OnDropfiles(UINT nMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);

@@ -1,6 +1,6 @@
 #include "stdafx.h"
-#include <Windowsx.h>
 #include <CommCtrl.h>
+#include <Windowsx.h>
 #include <commdlg.h>
 #include <shellapi.h>
 #include "MessageWindow.h"
